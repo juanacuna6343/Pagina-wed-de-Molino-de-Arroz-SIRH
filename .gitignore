@@ -1,5 +1,5 @@
 # Archivos de configuración sensibles
-.env
+# .env (temporalmente comentado para subir a Git)
 *.json
 proyecto1-1dc6c-firebase-adminsdk-fbsvc-*.json
 
