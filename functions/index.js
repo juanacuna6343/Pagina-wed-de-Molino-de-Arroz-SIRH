@@ -248,5 +248,183 @@ app.get('/dashboard', authenticateToken, (req, res) => {
   });
 });
 
+// ===================== RUTAS CRUD EMPLEADOS =====================
+
+// Obtener todos los empleados
+app.get('/empleados', authenticateToken, async (req, res) => {
+  try {
+    const snapshot = await admin.firestore().collection('empleados').get();
+    const empleados = [];
+    snapshot.forEach(doc => {
+      empleados.push({ id: doc.id, ...doc.data() });
+    });
+    res.json(empleados);
+  } catch (error) {
+    console.error('Error obteniendo empleados:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Crear empleado
+app.post('/empleados', authenticateToken, async (req, res) => {
+  try {
+    const empleadoData = req.body;
+    const docRef = await admin.firestore().collection('empleados').add({
+      ...empleadoData,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    res.json({ id: docRef.id, ...empleadoData });
+  } catch (error) {
+    console.error('Error creando empleado:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Actualizar empleado
+app.put('/empleados/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const empleadoData = req.body;
+    await admin.firestore().collection('empleados').doc(id).update({
+      ...empleadoData,
+      updatedAt: new Date()
+    });
+    res.json({ id, ...empleadoData });
+  } catch (error) {
+    console.error('Error actualizando empleado:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Eliminar empleado
+app.delete('/empleados/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await admin.firestore().collection('empleados').doc(id).delete();
+    res.json({ message: 'Empleado eliminado correctamente' });
+  } catch (error) {
+    console.error('Error eliminando empleado:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// ===================== RUTAS CRUD CONTRATOS =====================
+
+// Obtener todos los contratos
+app.get('/contratos', authenticateToken, async (req, res) => {
+  try {
+    const snapshot = await admin.firestore().collection('contratos').get();
+    const contratos = [];
+    snapshot.forEach(doc => {
+      contratos.push({ id: doc.id, ...doc.data() });
+    });
+    res.json(contratos);
+  } catch (error) {
+    console.error('Error obteniendo contratos:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Crear contrato
+app.post('/contratos', authenticateToken, async (req, res) => {
+  try {
+    const contratoData = req.body;
+    const docRef = await admin.firestore().collection('contratos').add({
+      ...contratoData,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    res.json({ id: docRef.id, ...contratoData });
+  } catch (error) {
+    console.error('Error creando contrato:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Actualizar contrato
+app.put('/contratos/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const contratoData = req.body;
+    await admin.firestore().collection('contratos').doc(id).update({
+      ...contratoData,
+      updatedAt: new Date()
+    });
+    res.json({ id, ...contratoData });
+  } catch (error) {
+    console.error('Error actualizando contrato:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Eliminar contrato
+app.delete('/contratos/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await admin.firestore().collection('contratos').doc(id).delete();
+    res.json({ message: 'Contrato eliminado correctamente' });
+  } catch (error) {
+    console.error('Error eliminando contrato:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// ===================== RUTAS DE BÚSQUEDA Y REPORTES =====================
+
+// Buscar empleado por documento o nombre
+app.get('/buscar', authenticateToken, async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q) {
+      return res.status(400).json({ error: 'Parámetro de búsqueda requerido' });
+    }
+
+    const empleadosRef = admin.firestore().collection('empleados');
+    
+    // Buscar por documento
+    let snapshot = await empleadosRef.where('NRO_DOCUMENTO', '==', q).get();
+    
+    // Si no encuentra por documento, buscar por nombre
+    if (snapshot.empty) {
+      snapshot = await empleadosRef.where('NOMBRE', '>=', q).where('NOMBRE', '<=', q + '\uf8ff').get();
+    }
+    
+    // Si no encuentra por nombre, buscar por apellido
+    if (snapshot.empty) {
+      snapshot = await empleadosRef.where('APELLIDO', '>=', q).where('APELLIDO', '<=', q + '\uf8ff').get();
+    }
+
+    const empleados = [];
+    snapshot.forEach(doc => {
+      empleados.push({ id: doc.id, ...doc.data() });
+    });
+
+    // Obtener contratos para cada empleado encontrado
+    const resultados = [];
+    for (const empleado of empleados) {
+      const contratosSnapshot = await admin.firestore()
+        .collection('contratos')
+        .where('EMPLEADO_ID', '==', empleado.id)
+        .get();
+      
+      const contratos = [];
+      contratosSnapshot.forEach(doc => {
+        contratos.push({ id: doc.id, ...doc.data() });
+      });
+
+      resultados.push({
+        empleado,
+        contratos
+      });
+    }
+
+    res.json(resultados);
+  } catch (error) {
+    console.error('Error en búsqueda:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // Export the Express app as a Firebase Function
 exports.api = functions.https.onRequest(app);

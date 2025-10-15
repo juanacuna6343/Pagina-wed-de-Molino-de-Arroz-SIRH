@@ -1,6 +1,48 @@
 // SIRH front-end logic (dashboard)
 // Verifica auth y provee CRUD de empleados y contratos, búsqueda y exportación
 
+// Función helper para operaciones de Firestore
+const firestoreOperation = async (operation) => {
+  try {
+    // Verificar que Firebase esté disponible
+    if (!window.firebaseDb) {
+      throw new Error('Firebase no está inicializado');
+    }
+    
+    // Importar dinámicamente las funciones de Firestore
+    const { 
+      collection, 
+      doc, 
+      getDocs, 
+      getDoc, 
+      addDoc, 
+      updateDoc, 
+      deleteDoc, 
+      query, 
+      where, 
+      orderBy 
+    } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    
+    const firestoreFunctions = {
+      collection,
+      doc,
+      getDocs,
+      getDoc,
+      addDoc,
+      updateDoc,
+      deleteDoc,
+      query,
+      where,
+      orderBy
+    };
+    
+    return await operation(window.firebaseDb, firestoreFunctions);
+  } catch (error) {
+    console.error('Error en operación de Firestore:', error);
+    throw error;
+  }
+};
+
 const token = localStorage.getItem('idToken');
 const devPreview = new URLSearchParams(location.search).has('devpreview');
 if (!token && !devPreview) {
@@ -15,8 +57,10 @@ const apiFetch = async (path, opts = {}) => {
   if (token) headers.Authorization = `Bearer ${token}`;
   if (devPreview) headers['x-devpreview'] = '1';
 
-  // Garantizar bypass en desarrollo también por query string
-  const url = devPreview ? (path.includes('?') ? `${path}&devpreview=1` : `${path}?devpreview=1`) : path;
+  // Usar Firebase Functions en producción
+  const baseUrl = location.hostname === 'localhost' ? 'http://localhost:3000' : '/api';
+  const url = `${baseUrl}${path}`;
+  
   const res = await fetch(url, { ...opts, headers });
   if (!res.ok) throw new Error(await res.text());
   const ct = res.headers.get('content-type') || '';
@@ -141,8 +185,65 @@ const empPaginationEnabled = !!(empPageSizeSel || empPrev || empNext || empPageL
 
 const capitalize = (s = '') => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
 
+// Funciones para empleados con Firestore
+const loadEmployees = async () => {
+  try {
+    const employees = await firestoreOperation(async (db, fs) => {
+      const employeesRef = fs.collection(db, 'employees');
+      const snapshot = await fs.getDocs(employeesRef);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    });
+    
+    empAll = employees;
+    
+    // Poblar filtro de cargo
+    if (empCargo) {
+      const cargos = Array.from(new Set(empAll.map(e => String(e.CARGO || '').trim()).filter(Boolean))).sort();
+      empCargo.innerHTML = '<option value="">Todos los cargos</option>' + cargos.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+    
+    applyEmpFilters(true);
+  } catch (error) {
+    console.error('Error cargando empleados:', error);
+    setToast('Error cargando empleados', 'error');
+  }
+};
+
+const saveEmployee = async (employeeData, id = null) => {
+  return firestoreOperation(async (db, fs) => {
+    if (id) {
+      const employeeRef = fs.doc(db, 'employees', id);
+      await fs.updateDoc(employeeRef, employeeData);
+      return { id, ...employeeData };
+    } else {
+      const employeesRef = fs.collection(db, 'employees');
+      const docRef = await fs.addDoc(employeesRef, employeeData);
+      return { id: docRef.id, ...employeeData };
+    }
+  });
+};
+
+const deleteEmployee = async (id) => {
+  return firestoreOperation(async (db, fs) => {
+    const employeeRef = fs.doc(db, 'employees', id);
+    await fs.deleteDoc(employeeRef);
+  });
+};
+
+const getEmployee = async (id) => {
+  return firestoreOperation(async (db, fs) => {
+    const employeeRef = fs.doc(db, 'employees', id);
+    const doc = await fs.getDoc(employeeRef);
+    if (doc.exists()) {
+      return { id: doc.id, ...doc.data() };
+    }
+    throw new Error('Empleado no encontrado');
+  });
+};
+
 const renderEmployees = (list, fillSelects = false) => {
   empTable.innerHTML = '';
+  
   // Estadísticas
   const total = empAll.length;
   const activos = empAll.filter(e => (e.ESTADO || '').toLowerCase() === 'activo').length;
@@ -162,22 +263,22 @@ const renderEmployees = (list, fillSelects = false) => {
     </td>`;
     empTable.appendChild(tr);
   } else {
-  list.forEach((e) => {
-    const tr = document.createElement('tr');
-    const estadoRaw = (e.ESTADO || '').toLowerCase();
-    const estadoClass = estadoRaw === 'activo' ? 'success' : 'muted';
-    tr.innerHTML = `
-      <td data-label="Documento">${e.NRO_DOCUMENTO}</td>
-      <td data-label="Nombre">${e.NOMBRE} ${e.APELLIDO}</td>
-      <td data-label="Cargo">${e.CARGO || '-'}</td>
-      <td data-label="Estado"><span class="chip ${estadoClass}">${capitalize(e.ESTADO || '')}</span></td>
-      <td data-label="Acciones">
-        <button class="btn sm" data-edit="${e.id}">Editar</button>
-        <button class="btn sm danger" data-del="${e.id}">Eliminar</button>
-      </td>
-    `;
-    empTable.appendChild(tr);
-  });
+    list.forEach((e) => {
+      const tr = document.createElement('tr');
+      const estadoRaw = (e.ESTADO || '').toLowerCase();
+      const estadoClass = estadoRaw === 'activo' ? 'success' : 'muted';
+      tr.innerHTML = `
+        <td data-label="Documento">${e.NRO_DOCUMENTO}</td>
+        <td data-label="Nombre">${e.NOMBRE} ${e.APELLIDO}</td>
+        <td data-label="Cargo">${e.CARGO || '-'}</td>
+        <td data-label="Estado"><span class="chip ${estadoClass}">${capitalize(e.ESTADO || '')}</span></td>
+        <td data-label="Acciones">
+          <button class="btn sm" data-edit="${e.id}">Editar</button>
+          <button class="btn sm danger" data-del="${e.id}">Eliminar</button>
+        </td>
+      `;
+      empTable.appendChild(tr);
+    });
   }
 
   // Rellenar select de contratos
@@ -203,33 +304,37 @@ const renderEmployees = (list, fillSelects = false) => {
       }
     });
 
-  // Sincronizar selección del formulario con el filtro si ya existe una selección
-  if (typeof conFilter !== 'undefined' && conFilter && conFilter.value) {
-    empSelectForContracts.value = conFilter.value;
-  } else if (empAll.length > 0) {
-    // Seleccionar por defecto el primer empleado para facilitar la creación
-    empSelectForContracts.value = empAll[0].id;
-  }
+    if (typeof conFilter !== 'undefined' && conFilter && conFilter.value) {
+      empSelectForContracts.value = conFilter.value;
+    } else if (empAll.length > 0) {
+      empSelectForContracts.value = empAll[0].id;
+    }
   }
 
   // Edición/Eliminación
   document.querySelectorAll('[data-edit]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-edit');
-      const e = await apiFetch(`/api/employees/${id}`);
-      document.getElementById('emp_id').value = e.id;
-      document.getElementById('emp_doc').value = e.NRO_DOCUMENTO;
-      document.getElementById('emp_nombre').value = e.NOMBRE;
-      document.getElementById('emp_apellido').value = e.APELLIDO;
-      document.getElementById('emp_edad').value = e.EDAD;
-      document.getElementById('emp_genero').value = e.GENERO;
-      document.getElementById('emp_cargo').value = e.CARGO || '';
-      document.getElementById('emp_correo').value = e.CORREO;
-      document.getElementById('emp_contacto').value = e.NRO_CONTACTO;
-      document.getElementById('emp_estado').value = e.ESTADO;
-      document.getElementById('emp_obs').value = e.OBSERVACIONES || '';
+      try {
+        const e = await getEmployee(id);
+        document.getElementById('emp_id').value = e.id;
+        document.getElementById('emp_doc').value = e.NRO_DOCUMENTO;
+        document.getElementById('emp_nombre').value = e.NOMBRE;
+        document.getElementById('emp_apellido').value = e.APELLIDO;
+        document.getElementById('emp_edad').value = e.EDAD;
+        document.getElementById('emp_genero').value = e.GENERO;
+        document.getElementById('emp_cargo').value = e.CARGO || '';
+        document.getElementById('emp_correo').value = e.CORREO;
+        document.getElementById('emp_contacto').value = e.NRO_CONTACTO;
+        document.getElementById('emp_estado').value = e.ESTADO;
+        document.getElementById('emp_obs').value = e.OBSERVACIONES || '';
+      } catch (error) {
+        console.error('Error cargando empleado:', error);
+        setToast('Error cargando empleado', 'error');
+      }
     });
   });
+  
   document.querySelectorAll('[data-del]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-del');
@@ -239,7 +344,7 @@ const renderEmployees = (list, fillSelects = false) => {
       }
       const release = setLoading(btn, 'Eliminando...');
       try {
-        await apiFetch(`/api/employees/${id}`, { method: 'DELETE' });
+        await deleteEmployee(id);
         setMsg('empMsg', 'Empleado eliminado correctamente.', 'success');
         await loadEmployees();
       } catch (err) {
@@ -252,22 +357,12 @@ const renderEmployees = (list, fillSelects = false) => {
   });
 };
 
-async function loadEmployees() {
-  const list = await apiFetch('/api/employees');
-  empAll = Array.isArray(list) ? list : [];
-  // Poblar filtro de cargo
-  if (empCargo) {
-    const cargos = Array.from(new Set(empAll.map(e => String(e.CARGO || '').trim()).filter(Boolean))).sort();
-    empCargo.innerHTML = '<option value="">Todos los cargos</option>' + cargos.map(c => `<option value="${c}">${c}</option>`).join('');
-  }
-  applyEmpFilters(true);
-}
-
 function applyEmpFilters(fillSelects = false) {
   const q = (empSearch && empSearch.value ? empSearch.value : '').trim().toLowerCase();
   const estado = (empEstado && empEstado.value ? empEstado.value : '').trim().toLowerCase();
   const cargo = (empCargo && empCargo.value ? empCargo.value : '').trim().toLowerCase();
   let filtered = empAll.slice();
+  
   if (q) {
     filtered = filtered.filter(e => {
       const doc = String(e.NRO_DOCUMENTO || '').toLowerCase();
@@ -293,7 +388,7 @@ function applyEmpFilters(fillSelects = false) {
     return 0;
   });
 
-  // Paginación (solo si hay controles visibles)
+  // Paginación
   if (empPaginationEnabled) {
     if (empPageSizeSel) {
       empPageSize = parseInt(empPageSizeSel.value, 10) || empPageSize;
@@ -361,11 +456,6 @@ if (empNext) {
   empNext.addEventListener('click', () => { empPage += 1; applyEmpFilters(); });
 }
 
-// Exportar CSV
-function toCSVRow(e) {
-  const vals = [e.NRO_DOCUMENTO, `${e.NOMBRE || ''} ${e.APELLIDO || ''}`.trim(), e.CARGO || '', e.ESTADO || '', e.CORREO || '', e.NRO_CONTACTO || ''];
-  return vals.map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(',');
-}
 function currentFilteredEmployees() {
   const q = (empSearch && empSearch.value ? empSearch.value : '').trim().toLowerCase();
   const estado = (empEstado && empEstado.value ? empEstado.value : '').trim().toLowerCase();
@@ -382,6 +472,205 @@ function currentFilteredEmployees() {
   if (cargo) filtered = filtered.filter(e => String(e.CARGO || '').toLowerCase() === cargo);
   return filtered;
 }
+
+empForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!empForm.checkValidity()) { empForm.reportValidity(); return; }
+  const submitBtn = empForm.querySelector('button[type="submit"]');
+  const payload = {
+    NRO_DOCUMENTO: document.getElementById('emp_doc').value.trim(),
+    NOMBRE: document.getElementById('emp_nombre').value.trim(),
+    APELLIDO: document.getElementById('emp_apellido').value.trim(),
+    EDAD: Number(document.getElementById('emp_edad').value),
+    GENERO: document.getElementById('emp_genero').value,
+    CARGO: document.getElementById('emp_cargo').value.trim(),
+    CORREO: document.getElementById('emp_correo').value.trim(),
+    NRO_CONTACTO: document.getElementById('emp_contacto').value.trim(),
+    ESTADO: document.getElementById('emp_estado').value,
+    OBSERVACIONES: document.getElementById('emp_obs').value.trim(),
+  };
+  const id = document.getElementById('emp_id').value;
+  const release = setLoading(submitBtn, 'Guardando...');
+  try {
+    await saveEmployee(payload, id || null);
+    setMsg('empMsg', 'Empleado guardado correctamente.', 'success');
+    empForm.reset();
+    document.getElementById('emp_id').value = '';
+    await loadEmployees();
+  } catch (err) {
+    console.error(err);
+    setMsg('empMsg', 'No fue posible guardar el empleado.', 'error');
+  } finally {
+    release();
+  }
+});
+
+// ================= Contratos =================
+const conForm = document.getElementById('contractForm');
+const conTable = document.getElementById('contractsTable');
+const conFilter = document.getElementById('con_filter');
+const conClearFilter = document.getElementById('con_clear_filter');
+const conStatTotal = document.getElementById('con_stat_total');
+const conStatMonto = document.getElementById('con_stat_monto');
+
+const renderContracts = (list) => {
+  conTable.innerHTML = '';
+  
+  // Resumen de contratos
+  const total = list.length;
+  const monto = list.reduce((acc, c) => acc + Number(c.Valor || 0), 0);
+  if (conStatTotal) conStatTotal.textContent = String(total);
+  if (conStatMonto) conStatMonto.textContent = `$${monto.toLocaleString('es-CO')}`;
+  list.forEach((c) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="Empleado">${c.Empleado}</td>
+      <td data-label="Inicio">${c.Fecha_inicio}</td>
+      <td data-label="Fin">${c.Fecha_fin}</td>
+      <td data-label="Valor">$${Number(c.Valor).toLocaleString('es-CO')}</td>
+      <td data-label="Acciones">
+        <button class="btn sm" data-editc="${c.id}">Editar</button>
+        <button class="btn sm danger" data-delc="${c.id}">Eliminar</button>
+      </td>
+    `;
+    conTable.appendChild(tr);
+  });
+
+  if (list.length === 0) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="5">No hay contratos para mostrar.</td>`;
+    conTable.appendChild(tr);
+  }
+
+  document.querySelectorAll('[data-editc]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-editc');
+      try {
+        const c = await getContract(id);
+        document.getElementById('con_id').value = c.id;
+        document.getElementById('con_emp_select').value = c.employeeId;
+        document.getElementById('con_inicio').value = c.Fecha_inicio;
+        document.getElementById('con_fin').value = c.Fecha_fin;
+        document.getElementById('con_valor').value = c.Valor;
+      } catch (error) {
+        console.error('Error cargando contrato:', error);
+        setToast('Error cargando contrato', 'error');
+      }
+    });
+  });
+  
+  document.querySelectorAll('[data-delc]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-delc');
+      if (askDeleteConfirmation) {
+        const ok = await confirmDialog('¿Eliminar este contrato?');
+        if (!ok) return;
+      }
+      const release = setLoading(btn, 'Eliminando...');
+      try {
+        await deleteContract(id);
+        setMsg('conMsg', 'Contrato eliminado correctamente.', 'success');
+        const currentFilter = (typeof conFilter !== 'undefined' && conFilter && conFilter.value) ? conFilter.value : '';
+        await loadContracts(currentFilter);
+      } catch (err) {
+        console.error(err);
+        setMsg('conMsg', 'No fue posible eliminar el contrato.', 'error');
+      } finally {
+        release();
+      }
+    });
+  });
+};
+
+// Funciones para contratos con Firestore
+const loadContracts = async (employeeId = '') => {
+  try {
+    const contracts = await firestoreOperation(async (db, fs) => {
+      const contractsRef = fs.collection(db, 'contracts');
+      let q = contractsRef;
+      
+      if (employeeId) {
+        q = fs.query(contractsRef, fs.where('employeeId', '==', employeeId));
+      }
+      
+      const snapshot = await fs.getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    });
+    
+    renderContracts(contracts);
+  } catch (error) {
+    console.error('Error cargando contratos:', error);
+    setToast('Error cargando contratos', 'error');
+  }
+};
+
+const saveContract = async (contractData, id = null) => {
+  return firestoreOperation(async (db, fs) => {
+    if (id) {
+      const contractRef = fs.doc(db, 'contracts', id);
+      await fs.updateDoc(contractRef, contractData);
+      return { id, ...contractData };
+    } else {
+      const contractsRef = fs.collection(db, 'contracts');
+      const docRef = await fs.addDoc(contractsRef, contractData);
+      return { id: docRef.id, ...contractData };
+    }
+  });
+};
+
+const deleteContract = async (id) => {
+  return firestoreOperation(async (db, fs) => {
+    const contractRef = fs.doc(db, 'contracts', id);
+    await fs.deleteDoc(contractRef);
+  });
+};
+
+const getContract = async (id) => {
+  return firestoreOperation(async (db, fs) => {
+    const contractRef = fs.doc(db, 'contracts', id);
+    const doc = await fs.getDoc(contractRef);
+    if (doc.exists()) {
+      return { id: doc.id, ...doc.data() };
+    }
+    throw new Error('Contrato no encontrado');
+  });
+};
+
+// Inicialización
+// Inicialización segura sin top-level await
+(async () => {
+  try {
+    await loadEmployees();
+    const initialFilter = (typeof conFilter !== 'undefined' && conFilter && conFilter.value) ? conFilter.value : '';
+    await loadContracts(initialFilter);
+    setToast('Conectado a Firebase', 'success');
+  } catch (e) {
+    console.error('Error inicializando dashboard:', e);
+    setToast('Error conectando con Firebase', 'error');
+  }
+})();
+
+// Paginación
+if (empPageSizeSel) {
+  empPageSizeSel.addEventListener('change', () => {
+    empPageSize = parseInt(empPageSizeSel.value, 10) || 10;
+    empPage = 1;
+    applyEmpFilters();
+  });
+}
+if (empPrev) {
+  empPrev.addEventListener('click', () => { if (empPage > 1) { empPage -= 1; applyEmpFilters(); } });
+}
+if (empNext) {
+  empNext.addEventListener('click', () => { empPage += 1; applyEmpFilters(); });
+}
+
+// Exportar CSV
+function toCSVRow(e) {
+  const vals = [e.NRO_DOCUMENTO, `${e.NOMBRE || ''} ${e.APELLIDO || ''}`.trim(), e.CARGO || '', e.ESTADO || '', e.CORREO || '', e.NRO_CONTACTO || ''];
+  return vals.map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(',');
+}
+
 if (empExportCsv) {
   empExportCsv.addEventListener('click', () => {
     const rows = currentFilteredEmployees().map(toCSVRow);
@@ -419,11 +708,7 @@ empForm.addEventListener('submit', async (e) => {
   const id = document.getElementById('emp_id').value;
   const release = setLoading(submitBtn, 'Guardando...');
   try {
-    if (id) {
-      await apiFetch(`/api/employees/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
-    } else {
-      await apiFetch('/api/employees', { method: 'POST', body: JSON.stringify(payload) });
-    }
+    await saveEmployee(payload, id || null);
     setMsg('empMsg', 'Empleado guardado correctamente.', 'success');
     empForm.reset();
     document.getElementById('emp_id').value = '';
@@ -436,129 +721,28 @@ empForm.addEventListener('submit', async (e) => {
   }
 });
 
-// ================= Contratos =================
-const conForm = document.getElementById('contractForm');
-const conTable = document.getElementById('contractsTable');
-const conFilter = document.getElementById('con_filter');
-const conClearFilter = document.getElementById('con_clear_filter');
-const conStatTotal = document.getElementById('con_stat_total');
-const conStatMonto = document.getElementById('con_stat_monto');
-
-const renderContracts = (list) => {
-  conTable.innerHTML = '';
-  // Resumen de contratos
-  const total = list.length;
-  const monto = list.reduce((acc, c) => acc + Number(c.Valor || 0), 0);
-  if (conStatTotal) conStatTotal.textContent = String(total);
-  if (conStatMonto) conStatMonto.textContent = `$${monto.toLocaleString('es-CO')}`;
-  list.forEach((c) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td data-label="Empleado">${c.Empleado}</td>
-      <td data-label="Inicio">${c.Fecha_inicio}</td>
-      <td data-label="Fin">${c.Fecha_fin}</td>
-      <td data-label="Valor">$${Number(c.Valor).toLocaleString('es-CO')}</td>
-      <td data-label="Acciones">
-        <button class="btn sm" data-editc="${c.id}">Editar</button>
-        <button class="btn sm danger" data-delc="${c.id}">Eliminar</button>
-      </td>
-    `;
-    conTable.appendChild(tr);
-  });
-
-  if (list.length === 0) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="5">No hay contratos para mostrar.</td>`;
-    conTable.appendChild(tr);
-  }
-
-  document.querySelectorAll('[data-editc]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-editc');
-      const c = await apiFetch(`/api/contracts/${id}`);
-      document.getElementById('con_id').value = c.id;
-      document.getElementById('con_emp_select').value = c.employeeId;
-      document.getElementById('con_inicio').value = c.Fecha_inicio;
-      document.getElementById('con_fin').value = c.Fecha_fin;
-      document.getElementById('con_valor').value = c.Valor;
-    });
-  });
-  document.querySelectorAll('[data-delc]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-delc');
-      if (askDeleteConfirmation) {
-        const ok = await confirmDialog('¿Eliminar este contrato?');
-        if (!ok) return;
-      }
-      const release = setLoading(btn, 'Eliminando...');
-      try {
-        await apiFetch(`/api/contracts/${id}`, { method: 'DELETE' });
-        setMsg('conMsg', 'Contrato eliminado correctamente.', 'success');
-        const currentFilter = (typeof conFilter !== 'undefined' && conFilter && conFilter.value) ? conFilter.value : '';
-        await loadContracts(currentFilter);
-      } catch (err) {
-        console.error(err);
-        setMsg('conMsg', 'No fue posible eliminar el contrato.', 'error');
-      } finally {
-        release();
-      }
-    });
-  });
-};
-
-async function loadContracts(employeeId = '') {
-  const list = await apiFetch(employeeId ? `/api/contracts?employeeId=${encodeURIComponent(employeeId)}` : '/api/contracts');
-  renderContracts(list);
-}
-
-// Filtro en la barra superior
-if (conFilter) {
-  conFilter.addEventListener('change', async () => {
-    const id = conFilter.value || '';
-    // sincronizar selección del formulario con el filtro
-    const empSel = document.getElementById('con_emp_select');
-    if (empSel) empSel.value = id || '';
-    await loadContracts(id);
-  });
-}
-if (conClearFilter) {
-  conClearFilter.addEventListener('click', async () => {
-    conFilter.value = '';
-    const empSel = document.getElementById('con_emp_select');
-    if (empSel) empSel.value = '';
-    await loadContracts('');
-  });
-}
-
+// ================= Formulario de contratos =================
 conForm.addEventListener('submit', async (e) => {
   e.preventDefault();
+  if (!conForm.checkValidity()) { conForm.reportValidity(); return; }
   const submitBtn = conForm.querySelector('button[type="submit"]');
-  const employeeId = document.getElementById('con_emp_select').value;
-  const empleadoText = document.getElementById('con_emp_select').selectedOptions[0]?.textContent || '';
-  const inicio = document.getElementById('con_inicio').value;
-  const fin = document.getElementById('con_fin').value;
-  const valorNum = Number(document.getElementById('con_valor').value);
-  // Validaciones básicas
-  if (!inicio || !fin) { setMsg('conMsg', 'Debe ingresar fechas inicio y fin.', 'warn'); return; }
-  if (new Date(fin) < new Date(inicio)) { setMsg('conMsg', 'La fecha fin debe ser mayor o igual a inicio.', 'error'); return; }
-  if (Number.isNaN(valorNum) || valorNum < 0) { setMsg('conMsg', 'El valor debe ser un número positivo.', 'error'); return; }
   const payload = {
-    Fecha_inicio: inicio,
-    Fecha_fin: fin,
-    Valor: valorNum,
-    employeeId,
-    Empleado: empleadoText.split(' – ')[0], // solo nombre
+    employeeId: document.getElementById('con_emp_select').value,
+    Empleado: document.getElementById('con_emp_select').selectedOptions[0]?.textContent || '',
+    Fecha_inicio: document.getElementById('con_inicio').value,
+    Fecha_fin: document.getElementById('con_fin').value,
+    Valor: Number(document.getElementById('con_valor').value)
   };
   const id = document.getElementById('con_id').value;
   const release = setLoading(submitBtn, 'Guardando...');
   try {
-    if (id) await apiFetch(`/api/contracts/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
-    else await apiFetch('/api/contracts', { method: 'POST', body: JSON.stringify(payload) });
+    await saveContract(payload, id || null);
     setMsg('conMsg', 'Contrato guardado correctamente.', 'success');
     conForm.reset();
     document.getElementById('con_id').value = '';
     const currentFilter = (typeof conFilter !== 'undefined' && conFilter && conFilter.value) ? conFilter.value : '';
     await loadContracts(currentFilter);
+    await loadEmployees(); // Actualizar lista de empleados para el selector
   } catch (err) {
     console.error(err);
     setMsg('conMsg', 'No fue posible guardar el contrato.', 'error');
@@ -567,17 +751,64 @@ conForm.addEventListener('submit', async (e) => {
   }
 });
 
+// Filtro de contratos
+if (conFilter) {
+  conFilter.addEventListener('change', async () => {
+    const selectedEmployeeId = conFilter.value;
+    await loadContracts(selectedEmployeeId);
+  });
+}
+
+// Limpiar filtro de contratos
+if (conClearFilter) {
+  conClearFilter.addEventListener('click', async () => {
+    if (conFilter) conFilter.value = '';
+    await loadContracts('');
+  });
+}
+
 // ================= Búsqueda y exportación =================
 const searchBtn = document.getElementById('searchBtn');
 const searchResult = document.getElementById('searchResult');
 let lastSearchEmployee = null;
+
+const searchEmployee = async (query) => {
+  return firestoreOperation(async (db, fs) => {
+    const employeesRef = fs.collection(db, 'employees');
+    const snapshot = await fs.getDocs(employeesRef);
+    const employees = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Buscar por documento o nombre
+    const employee = employees.find(e => {
+      const doc = String(e.NRO_DOCUMENTO || '').toLowerCase();
+      const nombre = `${String(e.NOMBRE || '').toLowerCase()} ${String(e.APELLIDO || '').toLowerCase()}`.trim();
+      return doc.includes(query.toLowerCase()) || nombre.includes(query.toLowerCase());
+    });
+    
+    if (!employee) {
+      throw new Error('Empleado no encontrado');
+    }
+    
+    // Buscar contratos del empleado
+    const contractsRef = fs.collection(db, 'contracts');
+    const contractsQuery = fs.query(contractsRef, fs.where('employeeId', '==', employee.id));
+    const contractsSnapshot = await fs.getDocs(contractsQuery);
+    const contracts = contractsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    return {
+      employee,
+      contratos: contracts,
+      totalContratos: contracts.length
+    };
+  });
+};
 
 searchBtn.addEventListener('click', async () => {
   const q = document.getElementById('search_q').value.trim();
   if (!q) { setToast('Digite el documento o nombre', 'warn'); return; }
   const release = setLoading(searchBtn, 'Buscando...');
   try {
-    const r = await apiFetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const r = await searchEmployee(q);
     lastSearchEmployee = r.employee;
     const contratos = Array.isArray(r.contratos) ? r.contratos : [];
     const total = Number(r.totalContratos || contratos.length);
@@ -636,29 +867,101 @@ searchBtn.addEventListener('click', async () => {
     console.error(err);
     setMsg('searchMsg', 'No se encontró el empleado.', 'error');
     setToast('No se encontró el empleado', 'warn');
-  }
-  finally {
+  } finally {
     release();
   }
 });
 
-// Descargar PDF/XLSX con token (solo botones individuales)
+// Descargar PDF/XLSX con generación del lado del cliente
 document.getElementById('pdfBtn').addEventListener('click', async (e) => {
   if (!lastSearchEmployee) { setToast('Realice una búsqueda primero', 'warn'); return; }
   const release = setLoading(e.currentTarget, 'Generando...');
   try {
-    const blob = await apiFetch(`/api/employees/${lastSearchEmployee.id}/contracts/pdf`);
+    // Generar PDF del lado del cliente
+    const employee = lastSearchEmployee;
+    const contracts = await firestoreOperation(async (db, fs) => {
+      const contractsRef = fs.collection(db, 'contracts');
+      const q = fs.query(contractsRef, fs.where('employeeId', '==', employee.id));
+      const snapshot = await fs.getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    });
+
+    // Crear contenido HTML para el PDF
+    const htmlContent = `
+      <html>
+        <head>
+          <title>Reporte de Contratos - ${employee.NOMBRE} ${employee.APELLIDO}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .employee-info { background: #f5f5f5; padding: 15px; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .total { font-weight: bold; background-color: #e8f4f8; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Reporte de Contratos</h1>
+            <h2>Molino de Arroz</h2>
+          </div>
+          <div class="employee-info">
+            <h3>Información del Empleado</h3>
+            <p><strong>Nombre:</strong> ${employee.NOMBRE} ${employee.APELLIDO}</p>
+            <p><strong>Documento:</strong> ${employee.NRO_DOCUMENTO}</p>
+            <p><strong>Cargo:</strong> ${employee.CARGO || 'N/A'}</p>
+            <p><strong>Estado:</strong> ${employee.ESTADO}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha Inicio</th>
+                <th>Fecha Fin</th>
+                <th>Valor</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${contracts.map(c => {
+                const activo = new Date(c.Fecha_fin) >= new Date();
+                return `
+                  <tr>
+                    <td>${c.Fecha_inicio}</td>
+                    <td>${c.Fecha_fin}</td>
+                    <td>$${Number(c.Valor).toLocaleString('es-CO')}</td>
+                    <td>${activo ? 'Activo' : 'Expirado'}</td>
+                  </tr>
+                `;
+              }).join('')}
+              <tr class="total">
+                <td colspan="2"><strong>Total Contratos:</strong></td>
+                <td><strong>$${contracts.reduce((acc, c) => acc + Number(c.Valor || 0), 0).toLocaleString('es-CO')}</strong></td>
+                <td><strong>${contracts.length}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    // Crear y descargar el archivo HTML como PDF
+    const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `contratos_${lastSearchEmployee.NRO_DOCUMENTO || lastSearchEmployee.id}.pdf`;
+    a.download = `contratos_${employee.NOMBRE}_${employee.APELLIDO}_${new Date().toISOString().split('T')[0]}.html`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setMsg('searchMsg', 'PDF generado y descargado.', 'success');
-  } catch (err) {
-    console.error(err);
-    setMsg('searchMsg', 'No fue posible generar el PDF.', 'error');
-    setToast('No fue posible generar el PDF', 'error');
+    
+    setMsg('searchMsg', 'Reporte HTML generado correctamente.', 'success');
+    setToast('Reporte HTML descargado', 'success');
+  } catch (e) {
+    console.error(e);
+    setMsg('searchMsg', 'No fue posible generar el reporte.', 'error');
+    setToast('No fue posible generar el reporte', 'error');
   } finally {
     release();
   }
@@ -668,34 +971,48 @@ document.getElementById('xlsxBtn').addEventListener('click', async (e) => {
   if (!lastSearchEmployee) { setToast('Realice una búsqueda primero', 'warn'); return; }
   const release = setLoading(e.currentTarget, 'Generando...');
   try {
-    const blob = await apiFetch(`/api/employees/${lastSearchEmployee.id}/contracts/xlsx`);
+    // Generar CSV del lado del cliente
+    const employee = lastSearchEmployee;
+    const contracts = await firestoreOperation(async (db, fs) => {
+      const contractsRef = fs.collection(db, 'contracts');
+      const q = fs.query(contractsRef, fs.where('employeeId', '==', employee.id));
+      const snapshot = await fs.getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    });
+
+    // Crear contenido CSV
+    const csvContent = [
+      // Encabezados
+      'Empleado,Documento,Cargo,Estado,Fecha Inicio,Fecha Fin,Valor,Estado Contrato',
+      // Datos
+      ...contracts.map(c => {
+        const activo = new Date(c.Fecha_fin) >= new Date();
+        return `"${employee.NOMBRE} ${employee.APELLIDO}","${employee.NRO_DOCUMENTO}","${employee.CARGO || 'N/A'}","${employee.ESTADO}","${c.Fecha_inicio}","${c.Fecha_fin}","${c.Valor}","${activo ? 'Activo' : 'Expirado'}"`;
+      }),
+      // Total
+      `"TOTAL","","","","","","${contracts.reduce((acc, c) => acc + Number(c.Valor || 0), 0)}","${contracts.length} contratos"`
+    ].join('\n');
+
+    // Crear y descargar el archivo CSV
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `contratos_${lastSearchEmployee.NRO_DOCUMENTO || lastSearchEmployee.id}.xlsx`;
+    a.download = `contratos_${employee.NOMBRE}_${employee.APELLIDO}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setMsg('searchMsg', 'XLSX generado y descargado.', 'success');
-  } catch (err) {
-    console.error(err);
-    setMsg('searchMsg', 'No fue posible generar el XLSX.', 'error');
-    setToast('No fue posible generar el XLSX', 'error');
+    
+    setMsg('searchMsg', 'Reporte CSV generado correctamente.', 'success');
+    setToast('Reporte CSV descargado', 'success');
+  } catch (e) {
+    console.error(e);
+    setMsg('searchMsg', 'No fue posible generar el CSV.', 'error');
+    setToast('No fue posible generar el CSV', 'error');
   } finally {
     release();
   }
 });
 
-// Fin del archivo - botones de exportación individuales restaurados
-
-// Inicialización
-// Inicialización segura sin top-level await
-(async () => {
-  try {
-    await loadEmployees();
-    const initialFilter = (typeof conFilter !== 'undefined' && conFilter && conFilter.value) ? conFilter.value : '';
-    await loadContracts(initialFilter);
-  } catch (e) {
-    console.error('Error inicializando dashboard:', e);
-    setToast('No se pudo cargar datos iniciales', 'error');
-  }
-})();
+// ... existing code ...
