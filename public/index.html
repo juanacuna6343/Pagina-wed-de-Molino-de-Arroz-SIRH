@@ -29,7 +29,17 @@
     <script type="module">
       import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
       import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-      import { firebaseConfig } from './config.js';
+      
+      // Configuración de Firebase directamente en el HTML
+      const firebaseConfig = {
+        apiKey: "AIzaSyDIxP8wdQ8aEEzTR1PWzVLq5Hueo3QnD98",
+        authDomain: "proyecto1-1dc6c.firebaseapp.com",
+        projectId: "proyecto1-1dc6c",
+        storageBucket: "proyecto1-1dc6c.appspot.com",
+        messagingSenderId: "288402890139",
+        appId: "1:288402890139:web:0c81d536995d0afd00d53e",
+        measurementId: "G-36P132HW77"
+      };
 
       const app = initializeApp(firebaseConfig);
       const auth = getAuth(app);
