@@ -1,0 +1,25 @@
+# Archivos de configuración sensibles
+.env
+*.json
+proyecto1-1dc6c-firebase-adminsdk-fbsvc-*.json
+
+# Dependencias
+node_modules/
+
+# Archivos de logs
+*.log
+npm-debug.log*
+
+# Archivos temporales
+tmp_*
+test_export.*
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
