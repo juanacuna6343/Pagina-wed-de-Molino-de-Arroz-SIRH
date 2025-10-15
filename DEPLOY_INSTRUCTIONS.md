@@ -1,21 +1,84 @@
 # 🚀 Instrucciones de Despliegue en Render
 
-## Pasos para Desplegar el SIRH Molino de Arroz en Render
+## ⚠️ SOLUCIÓN AL ERROR DE DESPLIEGUE
 
-### 1. Preparación del Proyecto
-- ✅ El proyecto ya está configurado para Render
-- ✅ Variables de entorno configuradas
-- ✅ Archivo `render.yaml` creado
+**Error encontrado**: `No se encontraron credenciales válidas para Firebase Admin`
 
-### 2. Configuración en Render
+**Causa**: Render no lee automáticamente el archivo `.env` - las variables deben configurarse en el Dashboard.
 
-1. **Crear cuenta en Render**: Ve a [render.com](https://render.com) y crea una cuenta
-2. **Conectar repositorio**: Conecta tu repositorio de GitHub
-3. **Crear Web Service**: 
-   - Selecciona "New Web Service"
-   - Conecta tu repositorio: `https://github.com/juanacuna6343/Pagina-wed-de-Molino-de-Arroz-SIRH`
+## Pasos para Corregir y Desplegar
 
-### 3. Configuración del Servicio
+### 1. Configurar Variables de Entorno en Render Dashboard
+
+**IMPORTANTE**: Ve a tu servicio en Render Dashboard → **Environment** y agrega estas variables:
+
+```
+NODE_ENV=production
+PORT=3000
+FIREBASE_PROJECT_ID=proyecto1-1dc6c
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@proyecto1-1dc6c.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAaSCBKcwggSjAgEAAoIBAQDJIOQbL1a5haVF
+VZ+mMe6y7ZnVOk+abwZ+wM8W2agKAnDA5wF/csFuFI0Y0A6ZLZurMXLhqLuDATVc
+es0nKwsACMJWvM4ti1JNGYT2AgxbenDEqHI+R548LbiTuYKTMfmu1D6fO+oa/XR5
+h6HtBvMYocmMO8L5zHM9CORgz0dEbVKYItlhpzR/DAikgH99As81l7wdirNXT2aj
+ar7XunJ1TpAovb6B8PglADYIWA93Ngu//RiAOSzAWlNj0oSMs1Td+XM7+7cI/Vpw
+D3FBcFp42adVogyZ27J+V+SDy/xlQB+KXe3PcASDVspxQAGVrEyDy31lcUfhsT2A
+S6qpdSBXAgMBAAECggEAUXtMPkEu4skkfBLks0leWUnN/Sb68edR288T9r9mBuwX
+LudHYZElkQmtYeSETYU/IBtP3eDkWn4GVrl/XINhGPnzdX1XD/d197tDdQC+bd8M
+SXeulNGh5uJk+R/6KNThwPTGi+8TeCy/X67VqHecy5lb1D6vzlCITS1JjHjc9/iU
+JSee7A++ZTA4w0IxEpJJFG/gUsNNPwcxIi2pD7Adf9RyMNc3ahpdhp/cW3ADstCx
+GWFV3wq5ckcA54lqLQPJV17oWPb5D2K0X2zJu6BfEIYRoAm2NrqUcSQzzYOM2KCR
+YhH2hJAC2kZtAdscmkIuvWG2TlXsaM3PYA8J5UJWeQKBgQDtkEWgeavxOCNSOb7A
+V/XvZ5ooz2V2emypDI0ZkoojWHAe2K3Iy/hHIrjrLOzubiuaV3pZkmM81hNQQ5zW
+g7+BMqQqFAhpYpWMEvuEVlsJRRPvdU3cd4uHRj2MN/+ln9XYOaX2UtwAb8WfC938
+JRhlxA6RpuESjBCNbkIwm/K+qQKBgQDYvMFVAYuw1vgVF4+tZ92s2DJvaB/n117+
+2jtNBfbiYCf6J3N8pwOV7e9ZDpDSuYAJpmOPp84OEM/oWX6cIWUxrp5hMxplhmV0
+rpvraP9HT4BfHaTYhInJrHdN0qIlmti2kXdV5qAfTX0chnzRGDX6h2ewRuE2mGuo
+7BPI1a9G/wKBgQCpWrBINnTdAagsdf4GIK6yfKjpbvBmBeBwowHzuQPBLsq/Mriw
+7LeR/q7U+LHvR5rN7I7MTA9yzyn1jj3ArytWb0OYu69DcYQq1112ehlsAlKz4mwf
+Pxm41doKm+EjsU5BVtd5QpiTtxqqx0r49XjvE1VPgCfzkOY77N5CyOnEAQKBgB1Y
+4azK+slFMm5YtGG8kK2Y0Kt5I+jWpsxHbIQvbJCWiJM8yEx2qOuiPiiG6mE+MPId
+j5miFSqeaCiEBbrKYtNpW5S5wLdCjXZRNleX7gkP4MgAUZPnzmh6a+UjwkTpRLLj
+247MHZ5fdbNpGnmNl7GGqCmcT15/IQTMgplNJeCtAoGAfkKPg/AuS0ANe0IIDMpJ
+erX7UiJ+rlTbGcoD85PzNOmwGb6kemw4I7yNR+u8qGq27/+jdHv6RKk/I0bY1SRc
+8wp9GlSLTsp65Hx9YvwkIZW22R294LKHK8Ku3bcSU904zLnOeaXEMZksGKW3MHX4
+/H1hKlJaF2M++hBc8mq+Jj0=
+-----END PRIVATE KEY-----
+GMAIL_USER=juan.acuna6343@gmail.com
+GMAIL_APP_PASSWORD=ntoohohcpjrrmaqd
+```
+
+### 2. Pasos Detallados para Configurar Variables
+
+1. **Accede a tu servicio en Render**
+2. **Ve a la pestaña "Environment"**
+3. **Haz clic en "Add Environment Variable"**
+4. **Agrega cada variable una por una:**
+   - Nombre: `NODE_ENV`, Valor: `production`
+   - Nombre: `PORT`, Valor: `3000`
+   - Nombre: `FIREBASE_PROJECT_ID`, Valor: `proyecto1-1dc6c`
+   - Nombre: `FIREBASE_CLIENT_EMAIL`, Valor: `firebase-adminsdk-fbsvc@proyecto1-1dc6c.iam.gserviceaccount.com`
+   - Nombre: `FIREBASE_PRIVATE_KEY`, Valor: [copia toda la clave privada de arriba]
+   - Nombre: `GMAIL_USER`, Valor: `juan.acuna6343@gmail.com`
+   - Nombre: `GMAIL_APP_PASSWORD`, Valor: `ntoohohcpjrrmaqd`
+
+### 3. Redeploy del Servicio
+
+1. **Guarda todas las variables**
+2. **Ve a la pestaña "Deploys"**
+3. **Haz clic en "Deploy Latest Commit"**
+4. **Espera a que termine el despliegue**
+
+### 4. Verificación
+
+El despliegue debería mostrar:
+```
+✅ Firebase Admin inicializado con variables de entorno
+✅ Servidor escuchando en puerto asignado por Render
+```
+
+## Configuración Original del Servicio
 
 **Configuración básica:**
 - **Name**: `sirh-molino-arroz`
@@ -24,69 +87,27 @@
 - **Start Command**: `npm start`
 - **Plan**: Free
 
-### 4. Variables de Entorno (CRÍTICO)
+## ⚠️ Problemas Comunes y Soluciones
 
-Debes configurar estas variables en Render Dashboard:
+### Error: "No se encontraron credenciales válidas"
+- **Causa**: Variables de entorno no configuradas en Render
+- **Solución**: Configurar todas las variables en Render Dashboard (no en archivo .env)
 
-```
-NODE_ENV=production
-PORT=10000
-FIREBASE_PROJECT_ID=proyecto1-1dc6c
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@proyecto1-1dc6c.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
-[AQUÍ VA TU PRIVATE KEY COMPLETA DE FIREBASE]
------END PRIVATE KEY-----"
-GMAIL_USER=juan.acuna6343@gmail.com
-GMAIL_APP_PASSWORD=ntoohohcpjrrmaqd
-```
-
-### 5. Obtener la Private Key de Firebase
-
-1. Ve a [Firebase Console](https://console.firebase.google.com/)
-2. Selecciona tu proyecto `proyecto1-1dc6c`
-3. Ve a **Project Settings** > **Service Accounts**
-4. Haz clic en **Generate new private key**
-5. Descarga el archivo JSON
-6. Copia el valor del campo `private_key` (incluyendo `-----BEGIN PRIVATE KEY-----` y `-----END PRIVATE KEY-----`)
-
-### 6. Configurar Variables en Render
-
-1. En tu servicio de Render, ve a **Environment**
-2. Agrega cada variable una por una
-3. Para `FIREBASE_PRIVATE_KEY`, pega toda la clave privada incluyendo los headers
-
-### 7. Deploy
-
-1. Haz clic en **Deploy Latest Commit**
-2. Espera a que termine el build (puede tomar 5-10 minutos)
-3. Tu aplicación estará disponible en: `https://sirh-molino-arroz.onrender.com`
-
-## ⚠️ Problemas Comunes
-
-### Error de Firebase
-- **Problema**: "No se encontraron credenciales válidas"
-- **Solución**: Verifica que todas las variables de Firebase estén correctamente configuradas
+### Error: "Invalid PEM formatted message"
+- **Causa**: Formato incorrecto de FIREBASE_PRIVATE_KEY
+- **Solución**: Copiar la clave completa incluyendo `-----BEGIN PRIVATE KEY-----` y `-----END PRIVATE KEY-----`
 
 ### Error de Puerto
-- **Problema**: La aplicación no inicia
-- **Solución**: Render asigna automáticamente el puerto, asegúrate de usar `process.env.PORT`
+- **Causa**: Puerto hardcodeado
+- **Solución**: El código ya usa `process.env.PORT || 3000` correctamente
 
-### Error de Build
-- **Problema**: `npm install` falla
-- **Solución**: Verifica que `package.json` esté en la raíz del proyecto
+## 🎉 Resultado Esperado
 
-## 📞 Soporte
+Una vez configuradas las variables correctamente, tu aplicación estará disponible en:
+`https://sirh-molino-arroz.onrender.com`
 
-Si tienes problemas:
-1. Revisa los logs en Render Dashboard
-2. Verifica que todas las variables de entorno estén configuradas
-3. Asegúrate de que el repositorio de GitHub esté actualizado
-
-## 🎉 ¡Listo!
-
-Una vez desplegado, tu SIRH estará disponible 24/7 en Render con todas las funcionalidades:
+Con todas las funcionalidades:
 - ✅ Login con recuperación de contraseña
-- ✅ CRUD de empleados
-- ✅ CRUD de contratos
+- ✅ CRUD de empleados y contratos
 - ✅ Búsqueda y exportación PDF/XLSX
-- ✅ Base de datos Firebase Firestore
+- ✅ Firebase Firestore funcionando

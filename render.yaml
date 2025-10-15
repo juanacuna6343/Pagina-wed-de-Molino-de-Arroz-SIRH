@@ -9,14 +9,14 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        sync: false
+        value: "3000"
       - key: FIREBASE_PROJECT_ID
-        sync: false
+        value: proyecto1-1dc6c
       - key: FIREBASE_CLIENT_EMAIL
-        sync: false
+        value: firebase-adminsdk-fbsvc@proyecto1-1dc6c.iam.gserviceaccount.com
       - key: FIREBASE_PRIVATE_KEY
-        sync: false
+        value: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDJIOQbL1a5haVF\nVZ+mMe6y7ZnVOk+abwZ+wM8W2agKAnDA5wF/csFuFI0Y0A6ZLZurMXLhqLuDATVc\nes0nKwsACMJWvM4ti1JNGYT2AgxbenDEqHI+R548LbiTuYKTMfmu1D6fO+oa/XR5\nh6HtBvMYocmMO8L5zHM9CORgz0dEbVKYItlhpzR/DAikgH99As81l7wdirNXT2aj\nar7XunJ1TpAovb6B8PglADYIWA93Ngu//RiAOSzAWlNj0oSMs1Td+XM7+7cI/Vpw\nD3FBcFp42adVogyZ27J+V+SDy/xlQB+KXe3PcASDVspxQAGVrEyDy31lcUfhsT2A\nS6qpdSBXAgMBAAECggEAUXtMPkEu4skkfBLks0leWUnN/Sb68edR288T9r9mBuwX\nLudHYZElkQmtYeSETYU/IBtP3eDkWn4GVrl/XINhGPnzdX1XD/d197tDdQC+bd8M\nSXeulNGh5uJk+R/6KNThwPTGi+8TeCy/X67VqHecy5lb1D6vzlCITS1JjHjc9/iU\nJSee7A++ZTA4w0IxEpJJFG/gUsNNPwcxIi2pD7Adf9RyMNc3ahpdhp/cW3ADstCx\nGWFV3wq5ckcA54lqLQPJV17oWPb5D2K0X2zJu6BfEIYRoAm2NrqUcSQzzYOM2KCR\nYhH2hJAC2kZtAdscmkIuvWG2TlXsaM3PYA8J5UJWeQKBgQDtkEWgeavxOCNSOb7A\nV/XvZ5ooz2V2emypDI0ZkoojWHAe2K3Iy/hHIrjrLOzubiuaV3pZkmM81hNQQ5zW\ng7+BMqQqFAhpYpWMEvuEVlsJRRPvdU3cd4uHRj2MN/+ln9XYOaX2UtwAb8WfC938\nJRhlxA6RpuESjBCNbkIwm/K+qQKBgQDYvMFVAYuw1vgVF4+tZ92s2DJvaB/n117+\n2jtNBfbiYCf6J3N8pwOV7e9ZDpDSuYAJpmOPp84OEM/oWX6cIWUxrp5hMxplhmV0\nrpvraP9HT4BfHaTYhInJrHdN0qIlmti2kXdV5qAfTX0chnzRGDX6h2ewRuE2mGuo\n7BPI1a9G/wKBgQCpWrBINnTdAagsdf4GIK6yfKjpbvBmBeBwowHzuQPBLsq/Mriw\n7LeR/q7U+LHvR5rN7I7MTA9yzyn1jj3ArytWb0OYu69DcYQq1112ehlsAlKz4mwf\nPxm41doKm+EjsU5BVtd5QpiTtxqqx0r49XjvE1VPgCfzkOY77N5CyOnEAQKBgB1Y\n4azK+slFMm5YtGG8kK2Y0Kt5I+jWpsxHbIQvbJCWiJM8yEx2qOuiPiiG6mE+MPId\nj5miFSqeaCiEBbrKYtNpW5S5wLdCjXZRNleX7gkP4MgAUZPnzmh6a+UjwkTpRLLj\n247MHZ5fdbNpGnmNl7GGqCmcT15/IQTMgplNJeCtAoGAfkKPg/AuS0ANe0IIDMpJ\nerX7UiJ+rlTbGcoD85PzNOmwGb6kemw4I7yNR+u8qGq27/+jdHv6RKk/I0bY1SRc\n8wp9GlSLTsp65Hx9YvwkIZW22R294LKHK8Ku3bcSU904zLnOeaXEMZksGKW3MHX4\n/H1hKlJaF2M++hBc8mq+Jj0=\n-----END PRIVATE KEY-----"
       - key: GMAIL_USER
-        sync: false
+        value: juan.acuna6343@gmail.com
       - key: GMAIL_APP_PASSWORD
-        sync: false
+        value: ntoohohcpjrrmaqd
