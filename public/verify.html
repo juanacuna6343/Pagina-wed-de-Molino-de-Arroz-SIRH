@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="description" content="Verificación de seguridad mediante código OTP para restablecer la contraseña." />
+    <title>Verificación de seguridad</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      .code-wrap { display: flex; gap: .5rem; justify-content: center; margin: 1rem 0; }
+      .code-box { width: 42px; height: 48px; text-align: center; font-size: 1.2rem; border-radius: 10px; border: 1px solid #1f2937; background: #0b1220; color: var(--text); }
+      .actions-col { display: grid; gap: .75rem; }
+      .divider { height: 1px; background: #1f2937; margin: 1rem 0; }
+      .muted { color: var(--muted); font-size: .9rem; text-align: center; }
+    </style>
+  </head>
+  <body class="login-body">
+    <header class="brand-header"><h1>SIRH • Tu Empresa</h1></header>
+    <div class="login-card">
+      <h1>Verificación de seguridad</h1>
+      <p class="subtitle">Introduce el código de seguridad enviado a tu correo</p>
+
+      <div id="emailInfo" class="muted"></div>
+      <div class="code-wrap">
+        <input class="code-box" maxlength="8" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" aria-label="Código parte 1" />
+        <input class="code-box" maxlength="8" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" aria-label="Código parte 2" />
+        <input class="code-box" maxlength="8" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" aria-label="Código parte 3" />
+        <input class="code-box" maxlength="8" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" aria-label="Código parte 4" />
+        <input class="code-box" maxlength="8" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" aria-label="Código parte 5" />
+        <input class="code-box" maxlength="8" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" aria-label="Código parte 6" />
+      </div>
+      <div class="muted">El código expira en: <span id="expiresIn">05:00</span></div>
+
+      <div class="actions-col" style="margin-top:.75rem;">
+        <button id="verifyBtn" class="btn primary">Verificar Código</button>
+        <button id="cancelBtn" class="btn">Cancelar</button>
+      </div>
+
+      <div class="divider"></div>
+      <div class="muted">¿No recibiste el código?</div>
+      <button id="resendBtn" class="btn" disabled>Reenviar código (<span id="resendCounter">30</span>s)</button>
+      <div id="verifyMsg" class="msg" role="status" aria-live="polite"></div>
+    </div>
+    <footer class="brand-footer">© 2025 SIRH • Tu Empresa</footer>
+
+    <script type="module">
+      // Flujo OTP propio: comunicación directa con backend
+
+      const params = new URLSearchParams(window.location.search);
+      const email = params.get('email') || '';
+      const emailInfo = document.getElementById('emailInfo');
+      const masked = email ? email.replace(/(^.).*(@.*$)/, '$1*******$2') : '';
+      emailInfo.textContent = email ? `Hemos enviado un código a ${email}` : '';
+
+      const msg = (t, type = 'info') => {
+        const el = document.getElementById('verifyMsg');
+        el.textContent = t;
+        el.className = `msg ${type}`;
+      };
+
+      // Manejo de inputs: distribuir pegado y concatenar
+      const boxes = Array.from(document.querySelectorAll('.code-box'));
+      const getCode = () => boxes.map((b) => b.value).join('').trim();
+      boxes.forEach((box, i) => {
+        box.addEventListener('input', (e) => {
+          const v = e.target.value;
+          if (v.length > 0 && i < boxes.length - 1) boxes[i + 1].focus();
+        });
+        box.addEventListener('paste', (e) => {
+          const clip = (e.clipboardData || window.clipboardData).getData('text');
+          if (!clip) return;
+          e.preventDefault();
+          const token = clip.replace(/\s+/g, '');
+          const chunk = Math.ceil(token.length / boxes.length);
+          boxes.forEach((b, idx) => {
+            b.value = token.slice(idx * chunk, (idx + 1) * chunk);
+          });
+          boxes[boxes.length - 1].focus();
+        });
+      });
+
+      // Temporizador de expiración (visual)
+      let seconds = 5 * 60; // 5 minutos
+      const expiresEl = document.getElementById('expiresIn');
+      const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+      const tickExp = () => { seconds--; if (seconds < 0) return; expiresEl.textContent = fmt(seconds); setTimeout(tickExp, 1000); };
+      tickExp();
+
+      // Reenvío bloqueado por 30s
+      const resendBtn = document.getElementById('resendBtn');
+      const counterEl = document.getElementById('resendCounter');
+      let resendSec = 30;
+      const tickResend = () => { resendSec--; counterEl.textContent = resendSec; if (resendSec <= 0) { resendBtn.disabled = false; resendBtn.textContent = 'Reenviar código'; } else { setTimeout(tickResend, 1000); } };
+      tickResend();
+
+      resendBtn.addEventListener('click', async () => {
+        if (!email) return msg('Correo no disponible para reenvío.', 'warn');
+        try {
+          resendBtn.disabled = true;
+          resendBtn.textContent = 'Reenviando...';
+          const res = await fetch('/api/otp/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          msg('Código reenviado. Revisa bandeja de entrada y spam.', 'success');
+          resendSec = 30; counterEl.textContent = resendSec; resendBtn.disabled = true; resendBtn.textContent = 'Reenviar código (30s)'; tickResend();
+        } catch (err) {
+          console.error(err);
+          try {
+            const j = JSON.parse(err.message || '{}');
+            msg(j.error || 'No fue posible reenviar el código.', 'error');
+          } catch (_) {
+            msg('No fue posible reenviar el código.', 'error');
+          }
+        }
+      });
+
+      document.getElementById('verifyBtn').addEventListener('click', async (e) => {
+        const code = getCode();
+        if (!code) return msg('Ingrese el código recibido.', 'warn');
+        try {
+          const btn = e.target;
+          btn.disabled = true;
+          btn.textContent = 'Verificando...';
+          const res = await fetch('/api/otp/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json().catch(() => ({}));
+          msg('Código verificado. Redirigiendo...', 'success');
+          setTimeout(() => {
+            window.location.href = `/reset.html?email=${encodeURIComponent(email)}&code=${encodeURIComponent(code)}`;
+          }, 300);
+        } catch (err) {
+          console.error(err);
+          try {
+            const j = JSON.parse(err.message || '{}');
+            msg(j.error || 'Código inválido o expirado.', 'error');
+          } catch (_) {
+            msg('Código inválido o expirado.', 'error');
+          }
+        } finally {
+          const btn = e.target;
+          btn.disabled = false;
+          btn.textContent = 'Verificar Código';
+        }
+      });
+
+      document.getElementById('cancelBtn').addEventListener('click', () => {
+        window.location.href = '/';
+      });
+    </script>
+  </body>
+  </html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Restablecer contraseña</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="login-body">
+    <div class="login-card">
+      <h1>Restablecer contraseña</h1>
+      <p class="subtitle">Ingresa el código y tu nueva contraseña</p>
+      <form id="resetForm" class="form">
+        <label for="newPassword">Nueva contraseña</label>
+        <input type="password" id="newPassword" placeholder="Mínimo 6 caracteres" required />
+
+        <label for="confirmPassword">Confirmar contraseña</label>
+        <input type="password" id="confirmPassword" placeholder="Repite la contraseña" required />
+
+        <button type="submit" class="btn primary">Restablecer</button>
+      </form>
+      <a href="/" class="btn link">Volver al login</a>
+      <div id="resetMsg" class="msg"></div>
+    </div>
+
+    <script type="module">
+      // Flujo OTP propio: reseteo vía backend con email+code
+
+      const msg = (t, type = 'info') => {
+        const el = document.getElementById('resetMsg');
+        el.textContent = t;
+        el.className = `msg ${type}`;
+      };
+
+      // Leer email y code desde URL si vienen de verify.html
+      const params = new URLSearchParams(window.location.search);
+      const email = params.get('email') || '';
+      const codeParam = params.get('code') || '';
+
+      document.getElementById('resetForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        // El código ya está en codeParam, no se necesita leer de input
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+
+        // Usar el código proveniente de la verificación; no se muestra en UI
+        const code = codeParam;
+        if (!code) return msg('Código no disponible. Verifique su código primero.', 'warn');
+        if (!newPassword || newPassword.length < 6) return msg('La nueva contraseña debe tener al menos 6 caracteres.', 'warn');
+        if (newPassword !== confirmPassword) return msg('Las contraseñas no coinciden.', 'warn');
+
+        try {
+          msg('Actualizando contraseña...', 'info');
+          const res = await fetch('/api/password/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code, newPassword }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          msg('Contraseña restablecida correctamente. Ahora puedes iniciar sesión.', 'success');
+          setTimeout(() => { window.location.href = '/'; }, 1200);
+        } catch (err) {
+          console.error(err);
+          try {
+            const j = JSON.parse(err.message || '{}');
+            msg(j.error || 'No fue posible restablecer la contraseña.', 'error');
+          } catch (_) {
+            msg('No fue posible restablecer la contraseña.', 'error');
+          }
+        }
+      });
+    </script>
+  </body>
+  </html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="description" content="Recuperación de contraseña segura con código OTP enviado al correo." />
+    <title>Recuperar Contraseña</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="login-body">
+    <header class="brand-header"><h1>SIRH • Tu Empresa</h1></header>
+    <div class="login-card">
+      <h1>Recuperación de contraseña</h1>
+      <p class="subtitle">Te enviaremos un código de verificación a tu correo</p>
+      <form id="recoverForm" class="form">
+        <label for="email">Correo electrónico</label>
+        <input type="email" id="email" placeholder="usuario@empresa.com" required autocomplete="email" inputmode="email" />
+        <button type="submit" class="btn primary">Enviar Código</button>
+      </form>
+      <a class="btn link" href="/">Volver al Login</a>
+      <div id="recoverMsg" class="msg" role="status" aria-live="polite"></div>
+    </div>
+    <footer class="brand-footer">© 2025 SIRH • Tu Empresa</footer>
+  
+    <script type="module">
+      // Para OTP propio, no es necesario usar Firebase aquí
+
+      const msg = (t, type = 'info') => {
+        const el = document.getElementById('recoverMsg');
+        el.textContent = t;
+        el.className = `msg ${type}`;
+      };
+
+      document.getElementById('recoverForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        if (!email) return msg('Ingresa tu correo electrónico', 'warn');
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) return msg('Correo inválido.', 'warn');
+        try {
+          const submitBtn = e.target.querySelector('button[type="submit"]');
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Enviando...';
+          msg('Enviando código a tu correo...', 'info');
+          const res = await fetch('/api/otp/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json().catch(() => ({}));
+          // No mostrar el código en la interfaz
+          msg('Código enviado. Revisa bandeja de entrada y spam.', 'success');
+          // Pequeña espera para evitar que el navegador marque la petición como abortada al redirigir
+          setTimeout(() => {
+            window.location.href = `/verify.html?email=${encodeURIComponent(email)}`;
+          }, 300);
+        } catch (err) {
+          console.error(err);
+          try {
+            const j = JSON.parse(err.message || '{}');
+            msg(j.error || 'No fue posible enviar el código.', 'error');
+          } catch (_) {
+            msg('No fue posible enviar el código.', 'error');
+          }
+        } finally {
+          const submitBtn = e.target.querySelector('button[type="submit"]');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Enviar Código';
+        }
+      });
+    </script>
+  </body>
+  </html>

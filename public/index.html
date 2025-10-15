@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="description" content="SIRH – Sistema de Gestión de Talento Humano. Inicie sesión para acceder al panel." />
+    <title>Molino de Arroz - SIRH | Login</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="login-body">
+    <header class="brand-header"><h1>SIRH • Tu Empresa</h1></header>
+    <div class="login-card">
+      <h1>SIRH</h1>
+      <p class="subtitle">Sistema de gestión de talento humano</p>
+      <form id="loginForm" class="form">
+        <label for="email">Correo institucional</label>
+        <input type="email" id="email" placeholder="usuario@empresa.com" required autocomplete="username" inputmode="email" />
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password" />
+        <button type="submit" class="btn primary">Ingresar</button>
+      </form>
+      <button id="forgotBtn" class="btn link">¿Olvidaste la contraseña?</button>
+      <div id="loginMsg" class="msg" role="status" aria-live="polite"></div>
+    </div>
+    <footer class="brand-footer">© 2025 SIRH • Tu Empresa</footer>
+
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+      import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+      import { firebaseConfig } from './config.js';
+
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+
+      const msg = (t, type = 'info') => {
+        const el = document.getElementById('loginMsg');
+        el.textContent = t;
+        el.className = `msg ${type}`;
+      };
+
+      document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        try {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Ingresando...';
+          const cred = await signInWithEmailAndPassword(auth, email, password);
+          const token = await cred.user.getIdToken();
+          localStorage.setItem('idToken', token);
+          window.location.href = '/dashboard.html';
+        } catch (err) {
+          console.error(err);
+          msg('Error en login. Verifique correo/contraseña.', 'error');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Ingresar';
+        }
+      });
+
+      document.getElementById('forgotBtn').addEventListener('click', () => {
+        window.location.href = '/recover.html';
+      });
+    </script>
+  </body>
+  </html>
